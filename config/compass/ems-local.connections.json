@@ -1,0 +1,27 @@
+{
+  "type": "Compass Connections",
+  "version": {
+    "major": 1,
+    "minor": 0
+  },
+  "connections": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "connectionOptions": {
+        "connectionString": "mongodb://localhost:27017/employee_management"
+      },
+      "favorite": {
+        "name": "EMS - Local (employee_management)"
+      }
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "connectionOptions": {
+        "connectionString": "mongodb://localhost:27017"
+      },
+      "favorite": {
+        "name": "EMS - Local (all databases)"
+      }
+    }
+  ]
+}

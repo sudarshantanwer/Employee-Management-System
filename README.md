@@ -20,6 +20,7 @@ A production-ready, full-stack **Employee Management System** with a **FastAPI**
 - [Role-Based Access Control](#role-based-access-control)
 - [Frontend](#frontend)
 - [Testing](#testing)
+- [MongoDB Compass](#mongodb-compass)
 - [Observability](#observability)
 - [Security Notes](#security-notes)
 - [License](#license)
@@ -409,6 +410,74 @@ pytest app/tests/ -v --cov=app --cov-report=term-missing
 - Authentication (register, login, refresh, logout, token blacklist)
 - Authorization (role-based access for all CRUD operations)
 - Employee CRUD (create, list, search, filter, update, soft delete)
+
+---
+
+## MongoDB Compass
+
+[MongoDB Compass](https://www.mongodb.com/products/compass) is the official GUI for browsing and querying your local database visually.
+
+### Option 1 — One-command launcher (recommended)
+
+```bash
+# Make script executable (first time only)
+chmod +x scripts/compass.sh
+
+# Verify MongoDB is running and open Compass
+./scripts/compass.sh
+```
+
+Install Compass if you don't have it yet:
+
+```bash
+./scripts/compass.sh --install    # macOS via Homebrew
+# Or download: https://www.mongodb.com/try/download/compass
+```
+
+### Option 2 — Import saved connection
+
+1. Open **MongoDB Compass**
+2. Click **Connect** → **Import saved connections**
+3. Select: `config/compass/ems-local.connections.json`
+4. Click **Connect** on **EMS - Local (employee_management)**
+
+### Option 3 — Manual connection string
+
+Paste this URI in Compass:
+
+```
+mongodb://localhost:27017/employee_management
+```
+
+### What you'll see
+
+| Collection | Contents |
+|------------|----------|
+| `users` | Registered users, hashed passwords, roles |
+| `employees` | Employee records (name, email, department, salary, etc.) |
+| `audit_logs` | Login, logout, and CRUD audit entries |
+
+### Ensure MongoDB is running first
+
+```bash
+# Check connection
+mongosh --eval "db.runCommand({ ping: 1 })"
+
+# Start via Homebrew
+brew services start mongodb-community
+
+# Or start via Docker
+docker compose up mongodb -d
+```
+
+### Docker vs local Compass URI
+
+| Setup | Compass connection string |
+|-------|--------------------------|
+| MongoDB via Homebrew | `mongodb://localhost:27017/employee_management` |
+| MongoDB via Docker Compose | `mongodb://localhost:27017/employee_management` |
+
+Both expose port `27017` on localhost, so the Compass URI is the same.
 
 ---
 
