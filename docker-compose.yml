@@ -1,0 +1,89 @@
+services:
+  fastapi:
+    build: .
+    container_name: ems-fastapi
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - ems-network
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    container_name: ems-celery-worker
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      - redis
+      - mongodb
+    networks:
+      - ems-network
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7.0
+    container_name: ems-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - ems-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ems-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ems-network
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:1.0.2-20
+    container_name: ems-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    depends_on:
+      - mongodb
+    networks:
+      - ems-network
+    restart: unless-stopped
+
+networks:
+  ems-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
