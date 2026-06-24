@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, EmailStr, Field
 
+from app.models.auth_provider import AuthProvider
 from app.models.enums import Role
 
 
@@ -42,6 +43,18 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
+class GoogleAuthRequest(BaseModel):
+    """Google Sign-In ID token payload from the frontend."""
+
+    id_token: str = Field(min_length=10)
+
+
+class GoogleCodeAuthRequest(BaseModel):
+    """Google OAuth authorization code from the frontend popup flow."""
+
+    code: str = Field(min_length=10)
+
+
 class AuthResponse(BaseModel):
     """Authentication response with user info and tokens."""
 
@@ -49,4 +62,5 @@ class AuthResponse(BaseModel):
     email: str
     full_name: str
     role: Role
+    auth_provider: AuthProvider = AuthProvider.LOCAL
     tokens: TokenResponse

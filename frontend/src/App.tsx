@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
 import { EmployeesPage } from './pages/EmployeesPage';
+import { GoogleCallbackPage } from './pages/GoogleCallbackPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 
@@ -15,6 +16,7 @@ export default function App() {
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
           </Route>
 
           <Route element={<ProtectedRoute />}>

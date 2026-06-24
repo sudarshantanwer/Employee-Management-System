@@ -18,6 +18,12 @@ class UserRepository:
     async def create_indexes(self) -> None:
         """Ensure required indexes exist."""
         await self._collection.create_index("email", unique=True)
+        await self._collection.create_index("google_id", unique=True, sparse=True)
+
+    async def get_by_google_id(self, google_id: str) -> dict[str, Any] | None:
+        """Find user by Google account ID."""
+        document = await self._collection.find_one({"google_id": google_id})
+        return serialize_document(document)
 
     async def create(self, user_data: dict[str, Any]) -> dict[str, Any]:
         """Insert a new user document."""

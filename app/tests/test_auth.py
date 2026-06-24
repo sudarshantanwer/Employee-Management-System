@@ -122,3 +122,115 @@ async def test_logout_blacklists_token(client: AsyncClient, admin_user: dict) ->
         headers={"Authorization": f"Bearer {tokens['access_token']}"},
     )
     assert protected_response.status_code == 401
+
+
+@pytest.fixture
+def mock_google_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock Google ID token verification for tests."""
+
+    def fake_verify(token: str) -> dict:
+        if token == "invalid-token":
+            from app.core.exceptions import UnauthorizedError
+
+            raise UnauthorizedError("Invalid Google token")
+        return {
+            "sub": "google-user-123",
+            "email": "googleuser@test.com",
+            "name": "Google User",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+    monkeypatch.setattr(
+        "app.services.auth_service.verify_google_id_token",
+        fake_verify,
+    )
+
+
+@pytest.mark.asyncio
+async def test_google_login_creates_user(client: AsyncClient, mock_google_token: None) -> None:
+    """Test Google sign-in creates a new user and returns tokens."""
+    response = await client.post(
+        "/api/v1/auth/google",
+        json={"id_token": "valid-google-token"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["data"]["email"] == "googleuser@test.com"
+    assert data["data"]["auth_provider"] == "google"
+    assert "access_token" in data["data"]["tokens"]
+
+
+@pytest.mark.asyncio
+async def test_google_login_invalid_token(client: AsyncClient, mock_google_token: None) -> None:
+    """Test Google sign-in rejects invalid tokens."""
+    response = await client.post(
+        "/api/v1/auth/google",
+        json={"id_token": "invalid-token"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_google_login_links_existing_email(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test Google sign-in links to an existing local account by email."""
+
+    def fake_verify_linked(token: str) -> dict:
+        return {
+            "sub": "google-user-456",
+            "email": "existing@test.com",
+            "name": "Existing User",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+    monkeypatch.setattr(
+        "app.services.auth_service.verify_google_id_token",
+        fake_verify_linked,
+    )
+
+    await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "existing@test.com",
+            "password": "SecurePass123!",
+            "full_name": "Existing User",
+            "role": "EMPLOYEE",
+        },
+    )
+
+    response = await client.post(
+        "/api/v1/auth/google",
+        json={"id_token": "valid-link-token"},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["auth_provider"] == "google"
+
+
+@pytest.mark.asyncio
+async def test_google_login_with_code(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Google sign-in via authorization code exchange."""
+
+    async def fake_exchange(code: str) -> dict:
+        return {
+            "sub": "google-code-user",
+            "email": "codeuser@test.com",
+            "name": "Code User",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+    monkeypatch.setattr(
+        "app.services.auth_service.exchange_google_auth_code",
+        fake_exchange,
+    )
+
+    response = await client.post(
+        "/api/v1/auth/google/code",
+        json={"code": "valid-auth-code-xyz"},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["email"] == "codeuser@test.com"

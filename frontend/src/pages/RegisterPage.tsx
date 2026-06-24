@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
+import { GoogleSignInButton, isGoogleAuthConfigured } from '../components/GoogleSignInButton';
 import { useAuth } from '../context/AuthContext';
 import { Alert, Button, Input } from '../components/ui';
 
@@ -11,6 +12,7 @@ export function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const showGoogle = isGoogleAuthConfigured();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,6 +45,21 @@ export function RegisterPage() {
               <Alert message={error} />
             </div>
           )}
+
+          {showGoogle && (
+            <>
+              <GoogleSignInButton loading={isLoading} text="signup_with" />
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-3 text-slate-500">or register with email</span>
+                </div>
+              </div>
+            </>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Full Name"
@@ -68,7 +85,7 @@ export function RegisterPage() {
               required
             />
             <Button type="submit" className="w-full" loading={isLoading}>
-              Create account
+              Create account with email
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-slate-600">

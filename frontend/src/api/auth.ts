@@ -37,6 +37,34 @@ export async function register(
   return data.data;
 }
 
+export async function googleLoginWithCode(code: string): Promise<AuthData> {
+  const { data } = await apiClient.post<ApiResponse<AuthData>>('/api/v1/auth/google/code', {
+    code,
+  });
+  setStoredTokens(data.data.tokens);
+  setStoredUser({
+    user_id: data.data.user_id,
+    email: data.data.email,
+    full_name: data.data.full_name,
+    role: data.data.role,
+  });
+  return data.data;
+}
+
+export async function googleLogin(idToken: string): Promise<AuthData> {
+  const { data } = await apiClient.post<ApiResponse<AuthData>>('/api/v1/auth/google', {
+    id_token: idToken,
+  });
+  setStoredTokens(data.data.tokens);
+  setStoredUser({
+    user_id: data.data.user_id,
+    email: data.data.email,
+    full_name: data.data.full_name,
+    role: data.data.role,
+  });
+  return data.data;
+}
+
 export async function logout(): Promise<void> {
   const tokens = getStoredTokens();
   if (tokens) {

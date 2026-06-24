@@ -54,9 +54,22 @@ class Settings(BaseSettings):
     # Cache
     employee_cache_ttl_seconds: int = 300  # 5 minutes
 
+    # Google OAuth
+    google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str = Field(
+        default="http://localhost:8000/api/v1/auth/google/callback",
+        alias="GOOGLE_REDIRECT_URI",
+    )
+    frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
+
     @property
     def is_development(self) -> bool:
         return self.app_env == "development"
+
+    @property
+    def google_auth_enabled(self) -> bool:
+        return bool(self.google_client_id)
 
 
 @lru_cache

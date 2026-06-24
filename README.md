@@ -258,12 +258,58 @@ npm run preview    # Preview production build at http://localhost:4173
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token TTL | `7` |
 | `CELERY_BROKER_URL` | Celery broker (Redis) | `redis://localhost:6379/1` |
 | `CELERY_RESULT_BACKEND` | Celery result backend | `redis://localhost:6379/2` |
+| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID | **Required for Google Sign-In** |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | Optional (ID token flow) |
 
 ### Frontend (`frontend/.env`)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `VITE_API_URL` | Backend API base URL | `http://localhost:8000` |
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client ID (same as backend) | **Required for Google button** |
+
+---
+
+## Google Authentication
+
+Sign in with Google is supported alongside email/password login.
+
+### Setup (Google Cloud Console)
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create a project (or select an existing one)
+3. Configure **OAuth consent screen** (External, add your email as test user for dev)
+4. Create **OAuth 2.0 Client ID** → Application type: **Web application**
+5. Add **Authorized JavaScript origins**:
+   - `http://localhost:5173`
+   - `http://localhost:8000`
+6. Copy the **Client ID** into both `.env` files:
+
+```env
+# Backend .env
+GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
+
+# frontend/.env
+VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
+```
+
+7. Restart backend and frontend
+
+### How it works
+
+1. User clicks **Sign in with Google** on the login/register page
+2. Google returns an ID token to the React frontend
+3. Frontend sends the token to `POST /api/v1/auth/google`
+4. Backend verifies the token with Google's public keys
+5. User is created (or linked by email) and receives JWT access + refresh tokens
+
+### Account linking
+
+| Scenario | Behavior |
+|----------|----------|
+| New Google user | Creates EMPLOYEE account with `auth_provider: google` |
+| Existing email (local account) | Links `google_id` to existing account |
+| Google-only account + password login | Returns error — use Google sign-in |
 
 ---
 
@@ -285,6 +331,7 @@ All API responses follow a standard envelope:
 |--------|----------|-------------|------|
 | `POST` | `/api/v1/auth/register` | Register new user (EMPLOYEE role) | No |
 | `POST` | `/api/v1/auth/login` | Login and receive JWT tokens | No |
+| `POST` | `/api/v1/auth/google` | Sign in with Google ID token | No |
 | `POST` | `/api/v1/auth/refresh` | Refresh access token | No |
 | `POST` | `/api/v1/auth/logout` | Blacklist tokens | Yes |
 
@@ -383,7 +430,8 @@ async def create_employee(...): ...
 
 ### Auth Flow
 
-1. User logs in → access + refresh tokens stored in `localStorage`
+1. User logs in via **email/password** or **Google Sign-In**
+2. Access + refresh tokens stored in `localStorage`
 2. Axios interceptor attaches `Authorization: Bearer <token>` to every request
 3. On `401`, the client automatically refreshes tokens and retries
 4. Logout blacklists both tokens server-side and clears local storage

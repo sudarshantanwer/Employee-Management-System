@@ -51,6 +51,7 @@ class AuditAction(str, Enum):
     DELETE_EMPLOYEE = "DELETE_EMPLOYEE"
     ROLE_CHANGE = "ROLE_CHANGE"
     REGISTER = "REGISTER"
+    GOOGLE_LOGIN = "GOOGLE_LOGIN"
 
 
 class CollectionName(str, Enum):

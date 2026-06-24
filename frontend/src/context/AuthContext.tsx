@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { login as apiLogin, logout as apiLogout, register as apiRegister } from '../api/auth';
+import { login as apiLogin, googleLoginWithCode as apiGoogleLoginWithCode, logout as apiLogout, register as apiRegister } from '../api/auth';
 import { clearStoredAuth, getStoredUser, setStoredUser } from '../api/client';
 import { Role, User } from '../types';
 
@@ -15,6 +15,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (code: string) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => Promise<void>;
   hasRole: (...roles: Role[]) => boolean;
@@ -34,6 +35,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const auth = await apiLogin(email, password);
+      const u: User = {
+        user_id: auth.user_id,
+        email: auth.email,
+        full_name: auth.full_name,
+        role: auth.role,
+      };
+      setUser(u);
+      setStoredUser(u);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const googleLogin = useCallback(async (code: string) => {
+    setIsLoading(true);
+    try {
+      const auth = await apiGoogleLoginWithCode(code);
       const u: User = {
         user_id: auth.user_id,
         email: auth.email,
@@ -81,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: !!user,
       isLoading,
       login,
+      googleLogin,
       register,
       logout,
       hasRole,
@@ -89,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canUpdateEmployee: user?.role === 'ADMIN' || user?.role === 'MANAGER',
       canDeleteEmployee: user?.role === 'ADMIN',
     }),
-    [user, isLoading, login, register, logout, hasRole]
+    [user, isLoading, login, googleLogin, register, logout, hasRole]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

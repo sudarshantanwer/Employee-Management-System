@@ -1,4 +1,5 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
+export type AuthProvider = 'local' | 'google';
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -20,6 +21,7 @@ export interface TokenPair {
 }
 
 export interface AuthData extends User {
+  auth_provider?: AuthProvider;
   tokens: TokenPair;
 }
 

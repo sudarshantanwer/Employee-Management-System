@@ -19,6 +19,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/14")
 os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/13")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id.apps.googleusercontent.com")
 
 from app.core.celery_app import celery_app
 from app.core.config import get_settings

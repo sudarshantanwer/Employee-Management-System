@@ -14,12 +14,21 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.models.auth_provider import AuthProvider
 from app.models.enums import AuditAction, Role
 from app.models.user import UserInDB
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import AuthResponse, TokenResponse, UserLoginRequest, UserRegisterRequest
+from app.schemas.auth import (
+    AuthResponse,
+    GoogleAuthRequest,
+    GoogleCodeAuthRequest,
+    TokenResponse,
+    UserLoginRequest,
+    UserRegisterRequest,
+)
 from app.services.audit_service import AuditService
+from app.services.google_auth_service import exchange_google_auth_code, verify_google_id_token
 from app.services.token_blacklist_service import TokenBlacklistService
 from app.tasks.email_tasks import send_welcome_email
 
@@ -52,6 +61,7 @@ class AuthService:
                 "hashed_password": hash_password(data.password),
                 "full_name": data.full_name,
                 "role": data.role.value,
+                "auth_provider": AuthProvider.LOCAL.value,
             }
         )
         user = UserInDB.from_mongo(user_doc)
@@ -64,6 +74,7 @@ class AuthService:
             email=user.email,
             full_name=user.full_name,
             role=user.role,
+            auth_provider=user.auth_provider,
             tokens=tokens,
         )
 
@@ -76,6 +87,11 @@ class AuthService:
         user = UserInDB.from_mongo(user_doc)
         if not user.is_active:
             raise UnauthorizedError("Account is deactivated")
+
+        if not user.hashed_password:
+            raise UnauthorizedError(
+                "This account uses Google sign-in. Please sign in with Google."
+            )
 
         if not verify_password(data.password, user.hashed_password):
             raise UnauthorizedError("Invalid email or password")
@@ -93,6 +109,77 @@ class AuthService:
             email=user.email,
             full_name=user.full_name,
             role=user.role,
+            auth_provider=user.auth_provider,
+            tokens=tokens,
+        )
+
+    async def google_login(self, data: GoogleAuthRequest) -> AuthResponse:
+        """Authenticate via Google ID token and return JWT tokens."""
+        payload = verify_google_id_token(data.id_token)
+        return await self._authenticate_google_payload(payload)
+
+    async def google_login_with_code(self, data: GoogleCodeAuthRequest) -> AuthResponse:
+        """Authenticate via Google OAuth authorization code (supports account picker)."""
+        payload = await exchange_google_auth_code(data.code)
+        return await self._authenticate_google_payload(payload)
+
+    async def _authenticate_google_payload(self, payload: dict[str, Any]) -> AuthResponse:
+        """Create or link user from verified Google token payload."""
+        google_id = payload["sub"]
+        email = payload["email"].lower()
+        full_name = payload.get("name") or email.split("@")[0]
+
+        user_doc = await self._user_repo.get_by_google_id(google_id)
+        is_new_user = False
+
+        if not user_doc:
+            existing = await self._user_repo.get_by_email(email)
+            if existing:
+                existing_user = UserInDB.from_mongo(existing)
+                if existing_user.google_id and existing_user.google_id != google_id:
+                    raise ConflictError("Email already linked to a different Google account")
+                user_doc = await self._user_repo.update(
+                    existing_user.id,
+                    {
+                        "google_id": google_id,
+                        "auth_provider": AuthProvider.GOOGLE.value,
+                        "full_name": full_name,
+                    },
+                )
+            else:
+                user_doc = await self._user_repo.create(
+                    {
+                        "email": email,
+                        "full_name": full_name,
+                        "role": Role.EMPLOYEE.value,
+                        "auth_provider": AuthProvider.GOOGLE.value,
+                        "google_id": google_id,
+                    }
+                )
+                is_new_user = True
+
+        user = UserInDB.from_mongo(user_doc)  # type: ignore[arg-type]
+        if not user.is_active:
+            raise UnauthorizedError("Account is deactivated")
+
+        tokens = self._generate_tokens(user.id, user.role.value)
+
+        await self._audit_service.log(
+            user_id=user.id,
+            action=AuditAction.GOOGLE_LOGIN,
+            resource="auth",
+            metadata={"is_new_user": is_new_user},
+        )
+
+        if is_new_user:
+            send_welcome_email.delay(user.email, user.full_name)
+
+        return AuthResponse(
+            user_id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            role=user.role,
+            auth_provider=user.auth_provider,
             tokens=tokens,
         )
 

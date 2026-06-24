@@ -1,13 +1,19 @@
 """Authentication API endpoints."""
 
 from typing import Annotated
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import RedirectResponse
 
+from app.core.config import get_settings
+from app.core.exceptions import ValidationError
 from app.dependencies.auth import get_auth_service, get_current_user
 from app.models.user import UserInDB
 from app.schemas.auth import (
     AuthResponse,
+    GoogleAuthRequest,
+    GoogleCodeAuthRequest,
     LogoutRequest,
     RefreshTokenRequest,
     TokenResponse,
@@ -16,8 +22,33 @@ from app.schemas.auth import (
 )
 from app.schemas.common import APIResponse
 from app.services.auth_service import AuthService
+from app.services.google_auth_service import build_google_authorization_url
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _redirect_to_frontend(auth: AuthResponse | None = None, error: str | None = None) -> RedirectResponse:
+    """Redirect browser back to the frontend with tokens or an error."""
+    settings = get_settings()
+    if error:
+        params = urlencode({"error": error})
+        return RedirectResponse(f"{settings.frontend_url}/auth/google/callback?{params}")
+
+    if auth is None:
+        params = urlencode({"error": "Authentication failed"})
+        return RedirectResponse(f"{settings.frontend_url}/auth/google/callback?{params}")
+
+    params = urlencode(
+        {
+            "access_token": auth.tokens.access_token,
+            "refresh_token": auth.tokens.refresh_token,
+            "user_id": auth.user_id,
+            "email": auth.email,
+            "full_name": auth.full_name,
+            "role": auth.role.value,
+        }
+    )
+    return RedirectResponse(f"{settings.frontend_url}/auth/google/callback?{params}")
 
 
 @router.post(
@@ -49,6 +80,87 @@ async def login(
     """Authenticate user and return tokens."""
     result = await auth_service.login(data)
     return APIResponse(success=True, message="Login successful", data=result)
+
+
+@router.get(
+    "/google/login",
+    summary="Start Google Sign-In (redirect)",
+    description=(
+        "Redirects the browser to Google OAuth. "
+        "Use this instead of the JavaScript popup to avoid 'no registered origin' errors."
+    ),
+)
+async def google_login_redirect(
+    prompt: Annotated[str, Query()] = "select_account",
+) -> RedirectResponse:
+    """Redirect user to Google OAuth consent screen."""
+    settings = get_settings()
+    if not settings.google_auth_enabled:
+        raise ValidationError("Google authentication is not configured")
+    url = build_google_authorization_url(prompt=prompt)
+    return RedirectResponse(url)
+
+
+@router.get(
+    "/google/callback",
+    summary="Google OAuth callback",
+    include_in_schema=False,
+)
+async def google_oauth_callback(
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    code: Annotated[str | None, Query()] = None,
+    error: Annotated[str | None, Query()] = None,
+) -> RedirectResponse:
+    """Handle Google OAuth redirect and send tokens to the frontend."""
+    if error:
+        return _redirect_to_frontend(error=error)
+    if not code:
+        return _redirect_to_frontend(error="Google did not return an authorization code")
+
+    try:
+        result = await auth_service.google_login_with_code(
+            GoogleCodeAuthRequest(code=code)
+        )
+        return _redirect_to_frontend(auth=result)
+    except Exception as exc:
+        return _redirect_to_frontend(error=str(exc))
+
+
+@router.post(
+    "/google",
+    response_model=APIResponse[AuthResponse],
+    summary="Google Sign-In",
+    description=(
+        "Authenticate with a Google ID token from the frontend Google Sign-In button. "
+        "Creates a new EMPLOYEE account or links to an existing account by email."
+    ),
+)
+async def google_login(
+    data: GoogleAuthRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> APIResponse[AuthResponse]:
+    """Authenticate user via Google OAuth ID token."""
+    result = await auth_service.google_login(data)
+    message = "Google sign-in successful"
+    return APIResponse(success=True, message=message, data=result)
+
+
+@router.post(
+    "/google/code",
+    response_model=APIResponse[AuthResponse],
+    summary="Google Sign-In (account picker)",
+    description=(
+        "Authenticate with a Google OAuth authorization code. "
+        "Use this flow to let users pick or switch Google accounts."
+    ),
+)
+async def google_login_with_code(
+    data: GoogleCodeAuthRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> APIResponse[AuthResponse]:
+    """Authenticate user via Google OAuth authorization code."""
+    result = await auth_service.google_login_with_code(data)
+    return APIResponse(success=True, message="Google sign-in successful", data=result)
 
 
 @router.post(
