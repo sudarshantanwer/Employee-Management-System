@@ -29,6 +29,7 @@ from app.core.security import hash_password
 from app.main import create_app
 from app.models.enums import Role
 from app.repositories.audit_log_repository import AuditLogRepository
+from app.repositories.department_repository import DepartmentRepository
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.user_repository import UserRepository
 
@@ -54,6 +55,7 @@ async def _ensure_connected() -> None:
     await UserRepository(db).create_indexes()
     await EmployeeRepository(db).create_indexes()
     await AuditLogRepository(db).create_indexes()
+    await DepartmentRepository(db).create_indexes()
 
 
 async def _clean_database() -> None:
@@ -62,6 +64,7 @@ async def _clean_database() -> None:
     await db["users"].delete_many({})
     await db["employees"].delete_many({})
     await db["audit_logs"].delete_many({})
+    await db["departments"].delete_many({})
     await redis_manager.get_client().flushdb()
 
 

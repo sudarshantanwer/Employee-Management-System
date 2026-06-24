@@ -41,3 +41,34 @@ class AuditLogRepository:
         result = await self._collection.insert_one(document)
         created = await self._collection.find_one({"_id": result.inserted_id})
         return serialize_document(created)  # type: ignore[return-value]
+
+    async def list_logs(
+        self,
+        page: int = 1,
+        limit: int = 10,
+        action: str | None = None,
+        user_id: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List audit logs with pagination and filters."""
+        query: dict[str, Any] = {}
+        if action:
+            query["action"] = action
+        if user_id:
+            query["user_id"] = user_id
+
+        total = await self._collection.count_documents(query)
+        skip = (page - 1) * limit
+        cursor = (
+            self._collection.find(query)
+            .sort("timestamp", -1)
+            .skip(skip)
+            .limit(limit)
+        )
+        documents = await cursor.to_list(length=limit)
+        return [serialize_document(doc) for doc in documents], total  # type: ignore[misc]
+
+    async def get_recent(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Get most recent audit log entries."""
+        cursor = self._collection.find({}).sort("timestamp", -1).limit(limit)
+        documents = await cursor.to_list(length=limit)
+        return [serialize_document(doc) for doc in documents]  # type: ignore[misc]

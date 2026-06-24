@@ -53,6 +53,10 @@ class Settings(BaseSettings):
 
     # Cache
     employee_cache_ttl_seconds: int = 300  # 5 minutes
+    password_reset_expire_minutes: int = Field(
+        default=60, alias="PASSWORD_RESET_EXPIRE_MINUTES"
+    )
+    analytics_cache_ttl_seconds: int = 120
 
     # Google OAuth
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")

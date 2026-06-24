@@ -12,10 +12,12 @@ from app.dependencies.auth import get_auth_service, get_current_user
 from app.models.user import UserInDB
 from app.schemas.auth import (
     AuthResponse,
+    ForgotPasswordRequest,
     GoogleAuthRequest,
     GoogleCodeAuthRequest,
     LogoutRequest,
     RefreshTokenRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserLoginRequest,
     UserRegisterRequest,
@@ -196,3 +198,37 @@ async def logout(
         user_id=current_user.id,
     )
     return APIResponse(success=True, message="Logout successful", data=None)
+
+
+@router.post(
+    "/forgot-password",
+    response_model=APIResponse[None],
+    summary="Request password reset",
+    description="Send a password reset email if the account exists and uses local auth.",
+)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> APIResponse[None]:
+    """Request password reset email."""
+    await auth_service.forgot_password(data.email)
+    return APIResponse(
+        success=True,
+        message="If an account exists with that email, a reset link has been sent.",
+        data=None,
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=APIResponse[None],
+    summary="Reset password",
+    description="Reset password using a valid token from the reset email.",
+)
+async def reset_password(
+    data: ResetPasswordRequest,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> APIResponse[None]:
+    """Reset password with token."""
+    await auth_service.reset_password(data.token, data.new_password)
+    return APIResponse(success=True, message="Password reset successful", data=None)

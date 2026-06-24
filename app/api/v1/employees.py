@@ -2,21 +2,72 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import PlainTextResponse
 
 from app.dependencies.auth import get_current_user
 from app.dependencies.rbac import get_employee_service
 from app.models.user import UserInDB
 from app.schemas.common import APIResponse, PaginatedData
 from app.schemas.employee import (
+    BulkImportResult,
     EmployeeCreateRequest,
     EmployeeFilterParams,
     EmployeeResponse,
     EmployeeUpdateRequest,
+    OrgChartNode,
 )
 from app.services.employee_service import EmployeeService
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
+
+
+@router.get(
+    "/org-chart",
+    response_model=APIResponse[list[OrgChartNode]],
+    summary="Organization chart",
+)
+async def get_org_chart(
+    current_user: Annotated[UserInDB, Depends(get_current_user)],
+    employee_service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> APIResponse[list[OrgChartNode]]:
+    """Get hierarchical organization chart."""
+    result = await employee_service.get_org_chart(current_user)
+    return APIResponse(success=True, message="Org chart retrieved successfully", data=result)
+
+
+@router.get(
+    "/export",
+    summary="Export employees as CSV",
+    response_class=PlainTextResponse,
+)
+async def export_employees(
+    current_user: Annotated[UserInDB, Depends(get_current_user)],
+    employee_service: Annotated[EmployeeService, Depends(get_employee_service)],
+) -> PlainTextResponse:
+    """Export all active employees as CSV."""
+    csv_content = await employee_service.export_csv(current_user)
+    return PlainTextResponse(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=employees.csv"},
+    )
+
+
+@router.post(
+    "/import",
+    response_model=APIResponse[BulkImportResult],
+    summary="Import employees from CSV",
+)
+async def import_employees(
+    current_user: Annotated[UserInDB, Depends(get_current_user)],
+    employee_service: Annotated[EmployeeService, Depends(get_employee_service)],
+    file: UploadFile = File(...),
+) -> APIResponse[BulkImportResult]:
+    """Bulk import employees from a CSV file."""
+    content = (await file.read()).decode("utf-8")
+    result = await employee_service.import_csv(content, current_user)
+    return APIResponse(success=True, message="Import completed", data=result)
 
 
 @router.get(

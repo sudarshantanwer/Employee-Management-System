@@ -1,5 +1,6 @@
 """Authentication service."""
 
+import secrets
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -30,7 +31,7 @@ from app.schemas.auth import (
 from app.services.audit_service import AuditService
 from app.services.google_auth_service import exchange_google_auth_code, verify_google_id_token
 from app.services.token_blacklist_service import TokenBlacklistService
-from app.tasks.email_tasks import send_welcome_email
+from app.tasks.email_tasks import send_password_reset_email, send_welcome_email
 
 
 class AuthService:
@@ -44,6 +45,7 @@ class AuthService:
         self._user_repo = UserRepository(db)
         self._audit_service = AuditService(AuditLogRepository(db))
         self._token_blacklist = TokenBlacklistService(redis_client)
+        self._redis = redis_client
 
     async def register(self, data: UserRegisterRequest) -> AuthResponse:
         """Register a new user account."""
@@ -222,6 +224,55 @@ class AuthService:
         await self._audit_service.log(
             user_id=user_id,
             action=AuditAction.LOGOUT,
+            resource="auth",
+        )
+
+    async def forgot_password(self, email: str) -> None:
+        """Generate password reset token and dispatch email."""
+        user_doc = await self._user_repo.get_by_email(email)
+        if not user_doc:
+            # Do not reveal whether email exists
+            return
+
+        user = UserInDB.from_mongo(user_doc)
+        if not user.hashed_password:
+            return
+
+        settings = get_settings()
+        token = secrets.token_urlsafe(32)
+        redis_key = f"password_reset:{token}"
+        ttl_seconds = settings.password_reset_expire_minutes * 60
+        await self._redis.setex(redis_key, ttl_seconds, user.id)
+
+        send_password_reset_email.delay(user.email, token)
+
+        await self._audit_service.log(
+            user_id=user.id,
+            action=AuditAction.PASSWORD_RESET_REQUEST,
+            resource="auth",
+        )
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        """Reset password using a valid token."""
+        redis_key = f"password_reset:{token}"
+        user_id = await self._redis.get(redis_key)
+        if not user_id:
+            raise ValidationError("Invalid or expired reset token")
+
+        user_id_str = user_id.decode() if isinstance(user_id, bytes) else user_id
+        user_doc = await self._user_repo.get_by_id(user_id_str)
+        if not user_doc:
+            raise ValidationError("Invalid or expired reset token")
+
+        user = UserInDB.from_mongo(user_doc)
+        await self._user_repo.update(
+            user.id, {"hashed_password": hash_password(new_password)}
+        )
+        await self._redis.delete(redis_key)
+
+        await self._audit_service.log(
+            user_id=user.id,
+            action=AuditAction.PASSWORD_RESET,
             resource="auth",
         )
 

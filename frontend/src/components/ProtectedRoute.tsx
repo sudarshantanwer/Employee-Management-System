@@ -21,3 +21,18 @@ export function PublicRoute() {
 
   return <Outlet />;
 }
+
+export function AdminRoute() {
+  const { isAuthenticated, hasRole } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!hasRole('ADMIN')) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Outlet />;
+}

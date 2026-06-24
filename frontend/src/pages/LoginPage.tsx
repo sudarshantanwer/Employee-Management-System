@@ -91,7 +91,12 @@ export function LoginPage() {
               Sign in with email
             </Button>
           </form>
-          <p className="mt-6 text-center text-sm text-slate-600">
+          <p className="mt-4 text-center text-sm">
+            <Link to="/forgot-password" className="font-medium text-brand-600 hover:text-brand-700">
+              Forgot password?
+            </Link>
+          </p>
+          <p className="mt-4 text-center text-sm text-slate-600">
             Don't have an account?{' '}
             <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
               Register

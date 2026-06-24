@@ -17,6 +17,7 @@ from app.middleware.logging import RequestLoggingMiddleware
 from app.middleware.prometheus import PrometheusMiddleware, metrics_endpoint
 from app.middleware.request_id import RequestIDMiddleware
 from app.repositories.audit_log_repository import AuditLogRepository
+from app.repositories.department_repository import DepartmentRepository
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.user_repository import UserRepository
 
@@ -35,6 +36,23 @@ async def lifespan(app: FastAPI):
     await UserRepository(db).create_indexes()
     await EmployeeRepository(db).create_indexes()
     await AuditLogRepository(db).create_indexes()
+    await DepartmentRepository(db).create_indexes()
+
+    # Seed default departments if collection is empty
+    dept_repo = DepartmentRepository(db)
+    if await dept_repo.count_active() == 0:
+        defaults = [
+            {"name": "IT", "description": "Information Technology"},
+            {"name": "HR", "description": "Human Resources"},
+            {"name": "Finance", "description": "Finance and Accounting"},
+            {"name": "Marketing", "description": "Marketing and Communications"},
+            {"name": "Operations", "description": "Operations"},
+            {"name": "Sales", "description": "Sales"},
+            {"name": "Engineering", "description": "Engineering"},
+        ]
+        for dept in defaults:
+            await dept_repo.create(dept)
+        logger.info("Seeded {} default departments", len(defaults))
 
     logger.info("Application startup complete")
     yield

@@ -62,3 +62,31 @@ class UserRepository:
     async def link_employee(self, user_id: str, employee_id: str) -> dict[str, Any] | None:
         """Link user to an employee profile."""
         return await self.update(user_id, {"employee_id": employee_id})
+
+    async def list_users(
+        self,
+        page: int = 1,
+        limit: int = 10,
+        search: str | None = None,
+        role: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List users with pagination and optional filters."""
+        query: dict[str, Any] = {}
+        if role:
+            query["role"] = role
+        if search:
+            import re
+
+            regex = re.compile(re.escape(search), re.IGNORECASE)
+            query["$or"] = [{"email": regex}, {"full_name": regex}]
+
+        total = await self._collection.count_documents(query)
+        skip = (page - 1) * limit
+        cursor = (
+            self._collection.find(query)
+            .sort("created_at", -1)
+            .skip(skip)
+            .limit(limit)
+        )
+        documents = await cursor.to_list(length=limit)
+        return [serialize_document(doc) for doc in documents], total  # type: ignore[misc]

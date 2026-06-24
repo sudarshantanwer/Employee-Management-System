@@ -16,6 +16,9 @@ class EmployeeInDB(BaseModel):
     designation: str
     salary: float
     manager_id: str | None = None
+    phone: str | None = None
+    address: str | None = None
+    emergency_contact: str | None = None
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False

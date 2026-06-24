@@ -89,3 +89,14 @@ export async function refreshTokens(): Promise<TokenPair> {
   setStoredTokens(data.data);
   return data.data;
 }
+
+export async function forgotPassword(email: string): Promise<void> {
+  await apiClient.post('/api/v1/auth/forgot-password', { email });
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await apiClient.post('/api/v1/auth/reset-password', {
+    token,
+    new_password: newPassword,
+  });
+}

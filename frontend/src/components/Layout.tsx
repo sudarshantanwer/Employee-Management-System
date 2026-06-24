@@ -2,8 +2,16 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Badge, Button } from './ui';
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+    isActive
+      ? 'bg-brand-50 text-brand-700'
+      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+  }`;
+
 export function Layout() {
-  const { user, logout, canViewEmployees } = useAuth();
+  const { user, logout, canViewEmployees, hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
 
   const roleColor = {
     ADMIN: 'purple' as const,
@@ -24,32 +32,21 @@ export function Layout() {
                 Employee Management
               </span>
             </Link>
-            <nav className="flex gap-1">
-              <NavLink
-                to="/dashboard"
-                className={({ isActive }) =>
-                  `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                  }`
-                }
-              >
-                Dashboard
-              </NavLink>
+            <nav className="flex flex-wrap gap-1">
+              <NavLink to="/dashboard" className={navLinkClass}>Dashboard</NavLink>
+              <NavLink to="/profile" className={navLinkClass}>Profile</NavLink>
               {canViewEmployees && (
-                <NavLink
-                  to="/employees"
-                  className={({ isActive }) =>
-                    `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-brand-50 text-brand-700'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`
-                  }
-                >
-                  Employees
-                </NavLink>
+                <>
+                  <NavLink to="/employees" className={navLinkClass}>Employees</NavLink>
+                  <NavLink to="/departments" className={navLinkClass}>Departments</NavLink>
+                  <NavLink to="/org-chart" className={navLinkClass}>Org Chart</NavLink>
+                </>
+              )}
+              {isAdmin && (
+                <>
+                  <NavLink to="/admin/users" className={navLinkClass}>Users</NavLink>
+                  <NavLink to="/admin/audit-logs" className={navLinkClass}>Audit Logs</NavLink>
+                </>
               )}
             </nav>
           </div>

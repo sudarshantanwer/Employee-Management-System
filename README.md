@@ -42,13 +42,25 @@ A production-ready, full-stack **Employee Management System** with a **FastAPI**
 - **Health Checks** — MongoDB, Redis, and application status
 - **Prometheus Metrics** — request count, duration, errors, active requests
 - **Structured Logging** — Loguru with console and file output (`logs/app.log`)
+- **Department Management** — CRUD for departments with employee counts
+- **User Management** — admin API to change roles, link employees, activate/deactivate users
+- **Self-Service Profile** — employees view/update contact info on linked records
+- **Password Reset** — forgot/reset flow with Redis tokens and Celery email (simulated)
+- **Dashboard Analytics** — headcount, salary averages, department breakdown, recent activity
+- **Org Chart** — hierarchical view from `manager_id` relationships
+- **Bulk Import/Export** — CSV export and import for employees
+- **Audit Log Viewer** — paginated, filterable audit trail (admin)
 
 ### Frontend
 - **React + TypeScript + Tailwind CSS** — modern, responsive UI
-- **Auth flows** — login, register, logout with automatic token refresh
+- **Auth flows** — login, register, logout, forgot/reset password with automatic token refresh
 - **Role-aware UI** — features shown/hidden based on user role
-- **Employee management** — table view with search, filters, pagination, create/edit/delete modals
-- **Dashboard** — user profile summary and live system health status
+- **Employee management** — table view with search, filters, pagination, CSV import/export, manager picker
+- **Dashboard** — analytics widgets, department breakdown, recent activity, system health
+- **Profile page** — self-service contact info for linked employee records
+- **Departments** — list and manage departments (admin CRUD)
+- **Org Chart** — visual reporting hierarchy
+- **Admin pages** — user management and audit log viewer
 
 ---
 
@@ -334,6 +346,8 @@ All API responses follow a standard envelope:
 | `POST` | `/api/v1/auth/google` | Sign in with Google ID token | No |
 | `POST` | `/api/v1/auth/refresh` | Refresh access token | No |
 | `POST` | `/api/v1/auth/logout` | Blacklist tokens | Yes |
+| `POST` | `/api/v1/auth/forgot-password` | Request password reset | No |
+| `POST` | `/api/v1/auth/reset-password` | Reset password with token | No |
 
 **Login example:**
 
@@ -352,6 +366,44 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 | `POST` | `/api/v1/employees` | Create employee | ADMIN, MANAGER |
 | `PUT` | `/api/v1/employees/{id}` | Update employee | ADMIN, MANAGER |
 | `DELETE` | `/api/v1/employees/{id}` | Soft delete employee | ADMIN |
+
+**Additional employee endpoints:**
+
+| Method | Endpoint | Description | Required Role |
+|--------|----------|-------------|---------------|
+| `GET` | `/api/v1/employees/org-chart` | Organization hierarchy | ADMIN, MANAGER |
+| `GET` | `/api/v1/employees/export` | Export employees CSV | ADMIN, MANAGER |
+| `POST` | `/api/v1/employees/import` | Import employees CSV | ADMIN, MANAGER |
+
+### Departments
+
+| Method | Endpoint | Description | Required Role |
+|--------|----------|-------------|---------------|
+| `GET` | `/api/v1/departments` | List departments | Authenticated |
+| `POST` | `/api/v1/departments` | Create department | ADMIN |
+| `PUT` | `/api/v1/departments/{id}` | Update department | ADMIN |
+| `DELETE` | `/api/v1/departments/{id}` | Delete department | ADMIN |
+
+### Users (Admin)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/users` | List users (paginated) |
+| `PUT` | `/api/v1/users/{id}` | Update role, employee link, status |
+
+### Profile
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/profile/me` | Get profile with linked employee |
+| `PUT` | `/api/v1/profile/me` | Update contact info |
+
+### Analytics & Audit
+
+| Method | Endpoint | Description | Required Role |
+|--------|----------|-------------|---------------|
+| `GET` | `/api/v1/analytics/dashboard` | Dashboard metrics | ADMIN, MANAGER |
+| `GET` | `/api/v1/audit-logs` | List audit logs | ADMIN |
 
 **Query parameters for list:**
 
@@ -425,8 +477,15 @@ async def create_employee(...): ...
 |-------|-------------|--------|
 | `/login` | Sign in | Public |
 | `/register` | Create account (EMPLOYEE) | Public |
-| `/dashboard` | Overview and system health | Authenticated |
-| `/employees` | Employee list and CRUD | ADMIN, MANAGER |
+| `/forgot-password` | Request password reset | Public |
+| `/reset-password` | Reset password with token | Public |
+| `/dashboard` | Analytics overview and system health | Authenticated |
+| `/profile` | Self-service profile | Authenticated |
+| `/employees` | Employee list, CRUD, import/export | ADMIN, MANAGER |
+| `/departments` | Department list and management | Authenticated (admin CRUD) |
+| `/org-chart` | Organization hierarchy | ADMIN, MANAGER |
+| `/admin/users` | User and role management | ADMIN |
+| `/admin/audit-logs` | Audit log viewer | ADMIN |
 
 ### Auth Flow
 
@@ -503,6 +562,7 @@ mongodb://localhost:27017/employee_management
 |------------|----------|
 | `users` | Registered users, hashed passwords, roles |
 | `employees` | Employee records (name, email, department, salary, etc.) |
+| `departments` | Department records |
 | `audit_logs` | Login, logout, and CRUD audit entries |
 
 ### Ensure MongoDB is running first

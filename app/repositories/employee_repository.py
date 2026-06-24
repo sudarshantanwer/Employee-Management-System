@@ -102,3 +102,53 @@ class EmployeeRepository:
         )
         documents = await cursor.to_list(length=limit)
         return serialize_documents(documents), total
+
+    async def list_all_active(self) -> list[dict[str, Any]]:
+        """List all active employees for org chart and export."""
+        cursor = self._collection.find({"is_deleted": False}).sort("name", 1)
+        documents = await cursor.to_list(length=10000)
+        return serialize_documents(documents)
+
+    async def count_active(self) -> int:
+        """Count active employees."""
+        return await self._collection.count_documents({"is_deleted": False})
+
+    async def count_by_department(self) -> list[dict[str, Any]]:
+        """Aggregate employee counts by department."""
+        pipeline = [
+            {"$match": {"is_deleted": False}},
+            {"$group": {"_id": "$department", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+        ]
+        return await self._collection.aggregate(pipeline).to_list(length=100)
+
+    async def average_salary(self) -> float:
+        """Calculate average salary of active employees."""
+        pipeline = [
+            {"$match": {"is_deleted": False}},
+            {"$group": {"_id": None, "avg": {"$avg": "$salary"}}},
+        ]
+        result = await self._collection.aggregate(pipeline).to_list(length=1)
+        if result and result[0].get("avg") is not None:
+            return round(float(result[0]["avg"]), 2)
+        return 0.0
+
+    async def count_new_hires_this_month(self) -> int:
+        """Count employees created in the current calendar month."""
+        now = datetime.now(UTC)
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return await self._collection.count_documents(
+            {"is_deleted": False, "created_at": {"$gte": start_of_month}}
+        )
+
+    async def bulk_create(self, employees: list[dict[str, Any]]) -> int:
+        """Insert multiple employee documents."""
+        if not employees:
+            return 0
+        now = datetime.now(UTC)
+        for emp in employees:
+            emp.setdefault("created_at", now)
+            emp.setdefault("updated_at", now)
+            emp.setdefault("is_deleted", False)
+        result = await self._collection.insert_many(employees)
+        return len(result.inserted_ids)

@@ -13,7 +13,12 @@ from app.core.redis import get_redis
 from app.dependencies.auth import get_current_user
 from app.models.enums import ROLE_PERMISSIONS, Permission, Role
 from app.models.user import UserInDB
+from app.services.analytics_service import AnalyticsService
+from app.services.audit_query_service import AuditQueryService
+from app.services.department_service import DepartmentService
 from app.services.employee_service import EmployeeService
+from app.services.profile_service import ProfileService
+from app.services.user_service import UserService
 
 
 def require_role(*roles: Role) -> Callable:
@@ -54,3 +59,39 @@ async def get_employee_service(
 ) -> EmployeeService:
     """Provide EmployeeService instance via dependency injection."""
     return EmployeeService(db, redis_client)
+
+
+async def get_department_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
+) -> DepartmentService:
+    """Provide DepartmentService instance via dependency injection."""
+    return DepartmentService(db)
+
+
+async def get_user_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
+) -> UserService:
+    """Provide UserService instance via dependency injection."""
+    return UserService(db)
+
+
+async def get_profile_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
+) -> ProfileService:
+    """Provide ProfileService instance via dependency injection."""
+    return ProfileService(db)
+
+
+async def get_analytics_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
+    redis_client: Annotated[aioredis.Redis, Depends(get_redis)],
+) -> AnalyticsService:
+    """Provide AnalyticsService instance via dependency injection."""
+    return AnalyticsService(db, redis_client)
+
+
+async def get_audit_query_service(
+    db: Annotated[AsyncIOMotorDatabase, Depends(get_database)],
+) -> AuditQueryService:
+    """Provide AuditQueryService instance via dependency injection."""
+    return AuditQueryService(db)

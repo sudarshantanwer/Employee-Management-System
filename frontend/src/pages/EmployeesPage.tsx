@@ -3,7 +3,9 @@ import { getErrorMessage } from '../api/client';
 import {
   createEmployee,
   deleteEmployee,
+  exportEmployeesCsv,
   fetchEmployees,
+  importEmployeesCsv,
   updateEmployee,
 } from '../api/employees';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +39,7 @@ export function EmployeesPage() {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Employee | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -116,6 +119,41 @@ export function EmployeesPage() {
   const formatSalary = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
+  const handleExport = async () => {
+    try {
+      const blob = await exportEmployeesCsv();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'employees.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      setSuccess('Employees exported successfully');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError('');
+    try {
+      const result = await importEmployeesCsv(file);
+      setSuccess(`Import complete: ${result.created} created, ${result.skipped} skipped`);
+      if (result.errors.length > 0) {
+        setError(result.errors.slice(0, 3).join('; '));
+      }
+      await loadEmployees();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -124,7 +162,16 @@ export function EmployeesPage() {
           <p className="text-sm text-slate-600">{total} total employees</p>
         </div>
         {canCreateEmployee && (
-          <Button onClick={openCreate}>+ Add Employee</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={handleExport}>Export CSV</Button>
+            <label>
+              <span className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                {importing ? 'Importing...' : 'Import CSV'}
+              </span>
+              <input type="file" accept=".csv" className="hidden" onChange={handleImport} disabled={importing} />
+            </label>
+            <Button onClick={openCreate}>+ Add Employee</Button>
+          </div>
         )}
       </div>
 

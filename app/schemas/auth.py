@@ -55,6 +55,19 @@ class GoogleCodeAuthRequest(BaseModel):
     code: str = Field(min_length=10)
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Request password reset email."""
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password with token."""
+
+    token: str = Field(min_length=10)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class AuthResponse(BaseModel):
     """Authentication response with user info and tokens."""
 
